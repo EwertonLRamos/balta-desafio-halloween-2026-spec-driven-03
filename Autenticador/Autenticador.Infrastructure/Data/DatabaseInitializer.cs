@@ -6,6 +6,16 @@ namespace Autenticador.Infrastructure.Data;
 
 public class DatabaseInitializer
 {
+    private const string NomeCredencialDeServico = "api-interna";
+    private const string SenhaFixturePadrao = "Senha123!";
+
+    private static readonly FixtureTeste[] Fixtures =
+    [
+        new("fixture-admin", "admin@teste", true),
+        new("fixture-operador", "operador@teste", true),
+        new("fixture-inativo", "inativo@teste", false)
+    ];
+
     private readonly IDatabaseConnectionFactory _databaseConnectionFactory;
     private readonly IPasswordHasher _passwordHasher;
     private readonly string _environmentName;
@@ -33,56 +43,47 @@ public class DatabaseInitializer
         using var connection = _databaseConnectionFactory.CreateConnection();
         connection.Open();
 
-        var users = await connection.QueryAsync<Usuario>("SELECT * FROM Usuarios");
-        var existingLogins = users.Select(x => x.Login).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var usuarios = (await connection.QueryAsync<Usuario>("SELECT * FROM Usuarios")).ToList();
+        var loginsExistentes = usuarios
+            .Select(usuario => usuario.Login)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var seedUsers = new[]
+        foreach (var fixture in Fixtures)
         {
-            new Usuario
-            {
-                Id = Guid.NewGuid().ToString(),
-                Login = "admin@teste",
-                SenhaHash = _passwordHasher.HashPassword("Senha123!"),
-                Ativo = true,
-                DataCriacao = DateTime.UtcNow,
-                QuantidadeFalhas = 0
-            },
-            new Usuario
-            {
-                Id = Guid.NewGuid().ToString(),
-                Login = "operador@teste",
-                SenhaHash = _passwordHasher.HashPassword("Senha123!"),
-                Ativo = true,
-                DataCriacao = DateTime.UtcNow,
-                QuantidadeFalhas = 0
-            },
-            new Usuario
-            {
-                Id = Guid.NewGuid().ToString(),
-                Login = "inativo@teste",
-                SenhaHash = _passwordHasher.HashPassword("Senha123!"),
-                Ativo = false,
-                DataCriacao = DateTime.UtcNow,
-                QuantidadeFalhas = 0
-            }
-        };
+            var usuarioExistente = usuarios.FirstOrDefault(usuario =>
+                string.Equals(usuario.Id, fixture.Id, StringComparison.Ordinal));
 
-        foreach (var usuario in seedUsers)
-        {
-            if (existingLogins.Contains(usuario.Login))
+            if (usuarioExistente is not null)
             {
+                loginsExistentes.Add(usuarioExistente.Login);
                 continue;
             }
+
+            var loginDisponivel = ObterLoginDisponivel(fixture.LoginPreferencial, loginsExistentes);
+            var usuarioFixture = new Usuario
+            {
+                Id = fixture.Id,
+                Login = loginDisponivel,
+                SenhaHash = _passwordHasher.HashPassword(SenhaFixturePadrao),
+                Ativo = fixture.Ativo,
+                DataCriacao = DateTime.UtcNow,
+                DataUltimaFalha = null,
+                QuantidadeFalhas = 0,
+                BloqueadoAte = null
+            };
 
             await connection.ExecuteAsync(@"
                 INSERT INTO Usuarios (Id, Login, SenhaHash, Ativo, DataCriacao, DataUltimaFalha, QuantidadeFalhas, BloqueadoAte)
                 VALUES (@Id, @Login, @SenhaHash, @Ativo, @DataCriacao, @DataUltimaFalha, @QuantidadeFalhas, @BloqueadoAte);",
-                usuario);
+                usuarioFixture);
+
+            usuarios.Add(usuarioFixture);
+            loginsExistentes.Add(loginDisponivel);
         }
 
         var hasServiceCredential = await connection.ExecuteScalarAsync<int>(
             "SELECT COUNT(1) FROM CredenciaisDeServico WHERE Nome = @Nome",
-            new { Nome = "api-interna" });
+            new { Nome = NomeCredencialDeServico });
 
         if (hasServiceCredential == 0)
         {
@@ -92,10 +93,31 @@ public class DatabaseInitializer
                 new CredencialDeServico
                 {
                     Id = Guid.NewGuid().ToString(),
-                    Nome = "api-interna",
+                    Nome = NomeCredencialDeServico,
                     ChaveSecreta = "servico-secreto",
                     Ativa = true
                 });
         }
     }
+
+    private static string ObterLoginDisponivel(string loginPreferencial, ISet<string> loginsExistentes)
+    {
+        if (!loginsExistentes.Contains(loginPreferencial))
+        {
+            return loginPreferencial;
+        }
+
+        for (var indice = 1; ; indice++)
+        {
+            var sufixo = indice == 1 ? ".teste" : $".teste-{indice}";
+            var loginAlternativo = $"{loginPreferencial}{sufixo}";
+
+            if (!loginsExistentes.Contains(loginAlternativo))
+            {
+                return loginAlternativo;
+            }
+        }
+    }
+
+    private sealed record FixtureTeste(string Id, string LoginPreferencial, bool Ativo);
 }

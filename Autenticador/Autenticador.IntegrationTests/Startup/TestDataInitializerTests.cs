@@ -36,6 +36,7 @@ public class TestDataInitializerTests
         }
         finally
         {
+            DatabaseConnectionFactory.ClearAllPools();
             if (File.Exists(databasePath))
             {
                 File.Delete(databasePath);
@@ -59,6 +60,7 @@ public class TestDataInitializerTests
         }
         finally
         {
+            DatabaseConnectionFactory.ClearAllPools();
             if (File.Exists(databasePath))
             {
                 File.Delete(databasePath);

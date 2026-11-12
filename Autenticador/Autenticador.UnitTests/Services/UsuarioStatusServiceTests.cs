@@ -45,6 +45,7 @@ public class UsuarioStatusServiceTests
         }
         finally
         {
+            DatabaseConnectionFactory.ClearAllPools();
             if (File.Exists(databasePath))
             {
                 File.Delete(databasePath);

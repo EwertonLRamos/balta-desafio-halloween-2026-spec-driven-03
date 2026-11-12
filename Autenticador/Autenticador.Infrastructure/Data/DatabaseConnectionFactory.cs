@@ -19,6 +19,11 @@ public class DatabaseConnectionFactory : IDatabaseConnectionFactory
         _connectionString = connectionString;
     }
 
+    public static void ClearAllPools()
+    {
+        SqliteConnection.ClearAllPools();
+    }
+
     public IDbConnection CreateConnection()
     {
         return new SqliteConnection(_connectionString);

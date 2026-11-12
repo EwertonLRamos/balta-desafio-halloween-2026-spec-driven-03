@@ -17,8 +17,16 @@ public partial class Program
         var builder = WebApplication.CreateBuilder(args);
 
         var connectionString = builder.Configuration.GetConnectionString("AutenticadorDatabase") ?? "Data Source=autenticador.db";
-        var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
-        var serviceCredentialSecret = builder.Configuration["ServiceCredential:Secret"];
+        var defaultJwtKey = builder.Environment.IsProduction() ? string.Empty : "12345678901234567890123456789012";
+        var jwtOptions = new JwtOptions
+        {
+            Key = builder.Configuration["Jwt:Key"] ?? defaultJwtKey,
+            Issuer = builder.Configuration["Jwt:Issuer"] ?? "Autenticador.Api",
+            Audience = builder.Configuration["Jwt:Audience"] ?? "Autenticador.Clientes",
+            ExpiresInMinutes = builder.Configuration.GetValue<int?>("Jwt:ExpiresInMinutes") ?? 60
+        };
+        var serviceCredentialSecret = builder.Configuration["ServiceCredential:Secret"]
+            ?? (builder.Environment.IsProduction() ? null : "servico-secreto");
 
         if (string.IsNullOrWhiteSpace(jwtOptions.Key) || Encoding.UTF8.GetByteCount(jwtOptions.Key) < 32)
         {
@@ -68,8 +76,6 @@ public partial class Program
 
         builder.Services.AddAuthorization();
         builder.Services.AddControllers();
-        builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen();
 
         var app = builder.Build();
 
@@ -79,12 +85,6 @@ public partial class Program
             var factory = scope.ServiceProvider.GetRequiredService<IDatabaseConnectionFactory>();
             var initializer = new DatabaseInitializer(factory, passwordHasher, app.Environment.EnvironmentName);
             await initializer.InitializeAsync();
-        }
-
-        if (app.Environment.IsDevelopment())
-        {
-            app.UseSwagger();
-            app.UseSwaggerUI();
         }
 
         app.UseHttpsRedirection();
