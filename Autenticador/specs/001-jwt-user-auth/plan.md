@@ -6,7 +6,7 @@
 
 ## Summary
 
-Implementar uma API HTTP em .NET 10 para autenticar usuários por login/senha, emitir JWT com a identidade do usuário e prazo de expiração, consultar atividade por login com autorização de serviço e inicializar três contas de teste somente em ambientes de desenvolvimento/teste. O plano também resolve a falha de inicialização `TypeLoadException` em `AddSwaggerGen`: alinhar Swashbuckle com o .NET 10, verificar a compatibilidade das assemblies efetivamente resolvidas e validar a geração do documento OpenAPI. A solução será estruturada em controllers finos, serviços de autenticação e repositórios Dapper com hashing unidirecional de senhas e limitação de tentativas por conta.
+Implementar uma API HTTP em .NET 10 para autenticar usuários por login/senha, emitir JWT válido por uma hora com a identidade do usuário, consultar atividade por login com autorização de serviço e inicializar três contas de teste somente em ambientes de desenvolvimento/teste. O plano também corrige a política de bloqueio: três falhas levam a 10 minutos de bloqueio, a duração dobra a cada novo bloqueio até 24 horas, e login válido reinicia a sequência. Para resolver a falha `TypeLoadException` em `AddSwaggerGen`, alinhar Swashbuckle à versão 10 compatível com .NET 10 e com Microsoft.OpenApi 2.x, verificar assemblies resolvidas e validar a geração OpenAPI.
 
 ## Technical Context
 
@@ -14,9 +14,9 @@ Implementar uma API HTTP em .NET 10 para autenticar usuários por login/senha, e
 
 **Primary Dependencies**: ASP.NET Core 10, Dapper, JWT (Microsoft.AspNetCore.Authentication.JwtBearer), Swashbuckle.AspNetCore 10.0.0 ou posterior compatível com .NET 10 (família Swagger alinhada), xUnit, FluentAssertions (or equivalent) e Microsoft.NET.Test.Sdk
 
-**Storage**: Banco relacional acessado por abstrações de persistência com Dapper; ambiente de testes com banco leve configurável (SQLite/PostgreSQL) e seed de usuários em desenvolvimento/teste
+**Storage**: Banco relacional acessado por abstrações de persistência com Dapper; implementação atual usa SQLite. Preservar dados existentes ao adicionar o estado persistido da sequência de bloqueios e manter seed de usuários apenas em desenvolvimento/teste.
 
-**Testing**: xUnit para testes unitários e de integração da API; testes de contrato HTTP com status e body de erro
+**Testing**: xUnit para testes unitários e de integração da API; testes de contrato HTTP com status e body de erro; relógio controlável para validar expiração de token e escalada/reset de bloqueios sem esperas reais
 
 **Target Platform**: API server executando em Linux/macOS/Windows via .NET 10, com foco em ambiente de desenvolvimento, teste e produção controlada
 
@@ -24,9 +24,9 @@ Implementar uma API HTTP em .NET 10 para autenticar usuários por login/senha, e
 
 **Performance Goals**: autenticação em <250 ms p95 em carga leve; suporte a dezenas de usuários com latência aceitável para endpoints de autenticação e consulta de status
 
-**Constraints**: senhas nunca em texto puro; respostas de autenticação equivalentes para login inexistente e senha incorreta; contas de teste só criadas em desenvolvimento/teste; autorização por credencial de serviço para consulta de existência/atividade; dependências Swagger/OpenAPI compatíveis com .NET 10 e assemblies resolvidas sem mistura de versões incompatíveis
+**Constraints**: senhas nunca em texto puro; respostas de autenticação equivalentes para login inexistente e senha incorreta; JWT válido por 60 minutos; bloqueio após três falhas consecutivas com backoff exponencial desde 10 minutos até 24 horas, reiniciado por login válido; contas de teste só criadas em desenvolvimento/teste; autorização por credencial de serviço para consulta de existência/atividade; dependências Swagger/OpenAPI binariamente compatíveis com .NET 10
 
-**Scale/Scope**: API com poucos usuários pré-definidos e fluxos de autenticação bem delimitados; sem necessidade de multi-tenant ou grande volume de dados inicial
+**Scale/Scope**: API com poucos usuários pré-definidos e fluxos de autenticação bem delimitados; sem necessidade de multi-tenant ou grande volume de dados inicial. Disponibilidade/SLO e observabilidade avançada não foram especificados e não fazem parte deste escopo.
 
 ## Constitution Check
 
@@ -83,11 +83,15 @@ Autenticador.IntegrationTests/
 
 **Structure Decision**: A implementação seguirá a separação em camadas exigida pela constituição, com projetos na raiz do repositório, e testes unitários/integrados abrangendo autenticação, consulta de atividade e seed de contas de teste.
 
-**Compatibilidade Swagger/OpenAPI**: Atualizar a referência do pacote meta `Swashbuckle.AspNetCore` para uma versão estável 10.0.0+ compatível com .NET 10; manter os componentes Swagger/SwaggerGen/SwaggerUI na mesma família resolvida, revisar alterações de API da migração v9→v10 e evitar referências diretas conflitantes a `Microsoft.OpenApi`. Confirmar a árvore resolvida e as assemblies efetivamente carregadas antes de atribuir a causa apenas ao cache/binários antigos.
+**Compatibilidade Swagger/OpenAPI**: O grafo NuGet observado resolve `Microsoft.OpenApi` 2.12.2 via `Microsoft.AspNetCore.OpenApi` 10.0.14 junto com Swashbuckle 9.0.3. A assinatura binária de Microsoft.OpenApi 2.x não é compatível com Swashbuckle 9; isso é a causa provável da falha de carregamento em `AddSwaggerGen`. Atualizar o pacote meta `Swashbuckle.AspNetCore` para a versão estável 10.0.0+ compatível com .NET 10, manter `Swagger`, `SwaggerGen` e `SwaggerUI` na mesma família, verificar o grafo e as assemblies de runtime, e aplicar os ajustes de API OpenAPI v1→v2 somente onde necessários. Não adicionar referência direta a Microsoft.OpenApi sem justificativa.
 
-**Validação de inicialização**: Com configurações locais válidas e ambiente `Development`, iniciar a API, confirmar que `AddSwaggerGen` não lança `TypeLoadException` e obter HTTP 200 em `/swagger/v1/swagger.json`. Incluir a verificação no fluxo de integração e no quickstart.
+**Política de bloqueio**: Persistir separadamente as falhas consecutivas desde o último bloqueio e a quantidade de bloqueios consecutivos desde um login válido. Cada bloco de três falhas aplica `min(10 minutos × 2^(quantidade de bloqueios anteriores), 24 horas)`; ao iniciar o bloqueio, zerar as falhas correntes e persistir o prazo. Recusas enquanto o bloqueio está ativo não avançam os contadores. Login válido zera ambos os contadores. Atualizações concorrentes de falhas devem ser atômicas para que solicitações simultâneas não ultrapassem a política.
 
-**Constitution Check pós-design**: PASS. A atualização major de Swashbuckle tem justificativa explícita de compatibilidade com .NET 10; não adiciona tipos de domínio nem altera a arquitetura em camadas. Testes de inicialização/documentação atendem ao princípio III, e os demais princípios permanecem preservados.
+**Evolução do armazenamento**: Adicionar `QuantidadeBloqueiosConsecutivos` à tabela `Usuarios` com migração aditiva e idempotente em `Autenticador.Infrastructure/Data/DatabaseConnectionFactory.cs` (ou mecanismo de migração já adotado); inicializar contas existentes com zero e preservar seus dados.
+
+**Validação de inicialização**: Com configurações locais válidas e ambiente `Development`, iniciar a API, confirmar ausência de `TypeLoadException` em `AddSwaggerGen` e obter HTTP 200 em `/swagger/v1/swagger.json`. Incluir teste de integração de inicialização/documentação.
+
+**Constitution Check pós-design**: PASS. A atualização major de Swashbuckle tem justificativa explícita de compatibilidade com .NET 10; a alteração da entidade e da persistência permanece encapsulada em camadas. Testes unitários da nova regra e de integração da inicialização/documentação atendem ao princípio III; demais princípios preservados.
 
 ## Complexity Tracking
 

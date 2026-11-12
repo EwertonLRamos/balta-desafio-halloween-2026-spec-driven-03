@@ -17,6 +17,9 @@
 - `login` deve ser tratado sem distinção entre maiúsculas e minúsculas.
 - `senha` nunca pode ser retornada em resposta.
 - Se a conta estiver inativa, bloqueada temporariamente ou com credenciais inválidas, a autenticação deve falhar sem emitir um token.
+- O token de sucesso tem validade de 60 minutos; `expiraEm` informa o instante de expiração.
+- Após três falhas consecutivas, o endpoint recusa autenticação por 10 minutos; cada bloqueio subsequente dobra a duração até o máximo de 24 horas. Uma autenticação bem-sucedida reinicia a sequência.
+- A resposta externa para senha incorreta, conta bloqueada ou inexistente permanece uniforme e não revela o contador nem a duração interna do bloqueio.
 
 ### Resposta de sucesso
 

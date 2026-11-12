@@ -45,6 +45,7 @@ Um usuário com uma conta ativa informa seu login e senha para receber um token 
 7. **Given** três tentativas consecutivas malsucedidas para uma conta sem bloqueios anteriores, **When** a terceira falha ocorre, **Then** novas tentativas ficam bloqueadas por 10 minutos e são liberadas automaticamente, sem bloqueio permanente da conta.
 8. **Given** que um bloqueio anterior terminou, **When** ocorrem outras três falhas consecutivas, **Then** a conta é bloqueada novamente pelo dobro da duração do bloqueio anterior, até o limite de 24 horas.
 9. **Given** uma conta que já sofreu bloqueios crescentes, **When** uma autenticação é bem-sucedida, **Then** a contagem de falhas é zerada e a duração de um bloqueio futuro volta a 10 minutos.
+10. **Given** uma conta durante um bloqueio ativo, **When** uma nova tentativa de autenticação é recebida, **Then** a tentativa é recusada sem prolongar o prazo nem alterar os contadores.
 
 ---
 
@@ -88,6 +89,7 @@ Uma pessoa desenvolvedora ou responsável por testes inicia o serviço e encontr
 - Uma conta desativada entre duas solicitações não pode obter um novo token após ser desativada.
 - Respostas de autenticação não devem distinguir se a falha ocorreu porque o login não existe ou porque a senha está incorreta.
 - Após três tentativas consecutivas de autenticação malsucedidas para uma conta, novas tentativas devem ser bloqueadas por 10 minutos na primeira ocorrência. Após cada bloqueio, o contador de falhas é reiniciado; cada novo grupo de três falhas consecutivas dobra a duração do bloqueio anterior, até o máximo de 24 horas. Um login válido zera as falhas e reinicia a duração para 10 minutos.
+- Tentativas recebidas enquanto um bloqueio está ativo devem ser recusadas sem alterar os contadores nem prolongar o bloqueio.
 - A consulta de existência deve retornar indicadores falsos para login desconhecido e não deve revelar atributos adicionais da conta.
 - As contas de teste não devem ser criadas em ambiente de produção nem substituir contas reais existentes.
 - A aplicação deve iniciar corretamente com configurações válidas e disponibilizar a documentação da API no ambiente de desenvolvimento.
@@ -109,7 +111,7 @@ Uma pessoa desenvolvedora ou responsável por testes inicia o serviço e encontr
 - **FR-011**: Falhas de autenticação MUST usar uma resposta equivalente para login inexistente e senha incorreta, evitando revelar qual caso ocorreu.
 - **FR-012**: O serviço MUST recusar pedidos de autenticação com login ou senha ausentes, vazios ou compostos apenas por espaços.
 - **FR-013**: O serviço MUST recusar a consulta de existência e atividade a consumidores sem autorização, sem revelar os indicadores consultados.
-- **FR-014**: Após três tentativas consecutivas de autenticação malsucedidas para uma conta, o serviço MUST bloquear novas tentativas por 10 minutos na primeira ocorrência e MUST restabelecê-las automaticamente. Após cada bloqueio, o contador de falhas MUST ser reiniciado; cada novo grupo de três falhas consecutivas MUST dobrar a duração do bloqueio anterior, limitada a 24 horas. Um login válido MUST zerar as falhas e reiniciar a duração para 10 minutos, sem bloquear permanentemente a conta.
+- **FR-014**: Após três tentativas consecutivas de autenticação malsucedidas para uma conta, o serviço MUST bloquear novas tentativas por 10 minutos na primeira ocorrência e MUST restabelecê-las automaticamente. Após cada bloqueio, o contador de falhas MUST ser reiniciado; cada novo grupo de três falhas consecutivas MUST dobrar a duração do bloqueio anterior, limitada a 24 horas. Um login válido MUST zerar as falhas e reiniciar a duração para 10 minutos. Tentativas durante bloqueio ativo MUST ser recusadas sem alterar contadores ou prazo, sem bloqueio permanente da conta.
 - **FR-015**: A aplicação MUST iniciar corretamente com configurações válidas e disponibilizar a documentação da API no ambiente de desenvolvimento.
 
 ### Key Entities *(include if feature involves data)*
@@ -127,7 +129,7 @@ Uma pessoa desenvolvedora ou responsável por testes inicia o serviço e encontr
 - **SC-003**: Em ambiente de desenvolvimento ou teste, as três contas previstas ficam disponíveis após a inicialização e permanecem sem duplicatas após pelo menos cinco reinicializações.
 - **SC-004**: Em uma amostra de todas as contas armazenadas, nenhuma senha pode ser recuperada em texto simples ou aparecer em respostas da autenticação e consulta.
 - **SC-005**: Pelo menos 95% de 100 solicitações de autenticação e consulta concluídas em condições normais de teste recebem resultado em até um segundo.
-- **SC-006**: Em todos os testes de aceitação, cada grupo de três falhas consecutivas bloqueia novas tentativas: 10 minutos na primeira ocorrência, o dobro da duração anterior nas ocorrências seguintes, até o máximo de 24 horas; as tentativas são liberadas automaticamente ao fim do prazo e um login válido reinicia a duração para 10 minutos.
+- **SC-006**: Em todos os testes de aceitação, cada grupo de três falhas consecutivas bloqueia novas tentativas: 10 minutos na primeira ocorrência, o dobro da duração anterior nas ocorrências seguintes, até o máximo de 24 horas; as tentativas são liberadas automaticamente ao fim do prazo, tentativas no período de bloqueio não alteram o prazo ou contadores e um login válido reinicia a duração para 10 minutos.
 - **SC-007**: Em ambiente de desenvolvimento com configurações válidas, a inicialização da API tem sucesso em 100% das execuções de validação e a documentação da API retorna HTTP 200 com uma descrição válida dos endpoints.
 - **SC-008**: Todo token de acesso emitido deixa de ser aceito após uma hora da emissão.
 

@@ -34,7 +34,7 @@
 - Esperado:
   - resposta HTTP 200;
   - token JWT presente;
-  - token contém apenas identidade e expiração;
+  - token contém apenas identidade e expiração, com validade de 60 minutos;
   - a senha não aparece no corpo nem no token.
 
 ### 3. Login com usuário inexistente ou senha incorreta
@@ -55,11 +55,15 @@
 
 ### 5. Limite de tentativas malsucedidas
 
-- Ação: repetir falhas para a mesma conta até exceder o limite
+- Ação: produzir três falhas consecutivas para a mesma conta ativa.
 - Esperado:
-  - novas tentativas são temporariamente bloqueadas;
-  - desbloqueio é automático após o período configurado;
+  - o terceiro erro inicia um bloqueio de 10 minutos;
+  - a conta é liberada automaticamente ao fim do prazo;
   - a conta não é permanentemente desativada.
+- Repetir três falhas após a liberação: o próximo bloqueio dura 20 minutos; repetições seguintes dobram a duração até 24 horas.
+- Confirmar que falhas recebidas durante bloqueio ativo não incrementam a contagem nem alteram o prazo; um login válido após a liberação reinicia o contador e a duração inicial para 10 minutos.
+- Os testes automatizados devem controlar o relógio para verificar expiração, duração escalonada, limite de 24 horas e reset sem esperar o tempo real.
+- Enviar falhas simultâneas para a mesma conta e verificar que a atualização atômica não perde incrementos nem permite ultrapassar o limite definido.
 
 ### 6. Consulta de existência e atividade
 
@@ -88,3 +92,4 @@
 - Não há criação de contas de teste em ambiente de produção.
 - Os contratos de resposta e erro permanecem consistentes em português e com ProblemDetails para validações.
 - A inicialização no ambiente de desenvolvimento não apresenta incompatibilidade binária do Swagger e o documento OpenAPI retorna HTTP 200.
+- O JWT tem validade de 60 minutos e o bloqueio progressivo segue os limites e resets descritos em [data-model.md](./data-model.md) e [auth-api.md](./contracts/auth-api.md).

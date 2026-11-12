@@ -7,7 +7,7 @@
 - A emissão de JWT usará a identidade do usuário como único payload obrigatório, com prazo de expiração explícito e sem incluir senha ou valor protegido.
 - A consulta de existência/atividade será exposta a consumidores autorizados por credencial de serviço, retornando somente os indicadores `existe` e `ativa`.
 - As falhas de autenticação serão tratadas com resposta uniforme, sem distinguir login inexistente de senha incorreta.
-- O controle de tentativas malsucedidas será por janela deslizante e bloqueio temporário por conta, sem desativação permanente.
+- O controle de tentativas malsucedidas será por conta: três falhas consecutivas iniciam um bloqueio de 10 minutos; cada bloqueio consecutivo dobra o período até 24 horas, e autenticação bem-sucedida reinicia a sequência.
 - Três contas de teste serão inicializadas somente quando `ASPNETCORE_ENVIRONMENT` for `Development` ou `Testing` e a base ainda não contiver esses usuários.
 
 ## Rationale
@@ -26,8 +26,9 @@ Esses padrões atendem às regras funcionais e às ressalvas de segurança descr
 
 - Autenticação com JWT: usar claims `sub`/`user_id` e `exp` como padrão do ASP.NET Core.
 - Armazenamento seguro de senha: usar `PBKDF2`/`Rfc2898DeriveBytes` ou `PasswordHasher` com salt e hash de credencial.
-- Controle de tentativas: manter contador e tempo de bloqueio por login, validando a janela de falhas em cada tentativa.
+- Controle de tentativas: manter contagem de falhas consecutivas e sequência de bloqueios por conta; não usar janela temporal de falhas, pois a política definida é por tentativas consecutivas.
 - Seed de usuários: usar inicialização da aplicação e verificação por login único para evitar duplicidade.
+- Expiração de token: emitir JWT com validade de 60 minutos, refletida em `exp` e no campo `expiraEm`.
 
 ## Compatibilidade do Swagger no .NET 10
 
@@ -37,7 +38,7 @@ Atualizar `Swashbuckle.AspNetCore` para a versão estável 10.0.0 ou posterior c
 
 ### Fundamentação
 
-O projeto mira `net10.0` e referencia `Swashbuckle.AspNetCore` 9.0.3, enquanto as notas oficiais da versão 10.0.0 declaram suporte ao ASP.NET Core 10 e registram a migração do Microsoft.OpenApi para a linha 2.x. O grafo NuGet atualmente resolvido reporta os componentes Swagger na versão 9.0.3, então não há evidência no arquivo de projeto de versões divergentes dentro da família Swashbuckle; a incompatibilidade com o framework e qualquer diferença entre assemblies resolvidas e copiadas devem ser verificadas durante a implementação. O erro em `AddSwaggerGen` deve ser tratado como falha de compatibilidade de carregamento, não como erro de endpoint de autenticação.
+O projeto mira `net10.0`, usa `Microsoft.AspNetCore.OpenApi` 10.0.14 e resolve `Microsoft.OpenApi` 2.12.2, mas referencia Swashbuckle 9.0.3. A versão 10 do Swashbuckle declara suporte a ASP.NET Core 10 e depende da nova família Microsoft.OpenApi 2.x; a versão 9 foi construída contra a família anterior. A mistura de APIs binárias explica a `TypeLoadException` em `AddSwaggerGen` e será corrigida alinhando os pacotes, depois confirmando o grafo e as assemblies efetivamente carregadas.
 
 ### Alternativas consideradas
 
@@ -50,3 +51,19 @@ O projeto mira `net10.0` e referencia `Swashbuckle.AspNetCore` 9.0.3, enquanto a
 - Notas oficiais do Swashbuckle.AspNetCore v10.0.0: https://github.com/domaindrivendev/Swashbuckle.AspNetCore/releases/tag/v10.0.0
 - Guia oficial de migração v9→v10: https://github.com/domaindrivendev/Swashbuckle.AspNetCore/blob/v10.0.0/docs/migrating-to-v10.md
 - Notas do v9.0.3: https://github.com/domaindrivendev/Swashbuckle.AspNetCore/releases/tag/v9.0.3
+
+## Bloqueio progressivo por falhas de login
+
+### Decisão
+
+Aplicar bloqueio temporário por conta após três falhas consecutivas. A duração inicial é 10 minutos; cada novo bloqueio consecutivo dobra a duração, limitada a 24 horas. Ao aplicar bloqueio, a contagem de falhas volta a zero. Uma autenticação bem-sucedida zera falhas e a sequência de bloqueios. Tentativas recusadas durante um bloqueio ativo não incrementam contadores.
+
+### Fundamentação
+
+A política concretiza as respostas da clarificação e limita tentativas repetidas sem bloqueio permanente. O contador de sequência deve ser persistido para conservar o backoff entre reinicializações. A atualização de contadores e prazo deve ser atômica no repositório, para que tentativas simultâneas não percam incrementos ou adiem a aplicação do bloqueio. Um relógio controlável nos testes permite validar a expiração sem aguardar minutos ou horas.
+
+### Alternativas consideradas
+
+- Manter duração fixa: não atende à duração crescente solicitada.
+- Bloqueio permanente: contradiz o requisito de liberação automática.
+- Reiniciar a escalada ao fim de cada bloqueio: não atende à regra de dobrar em falhas subsequentes; a sequência só reinicia com login válido.

@@ -12,7 +12,8 @@
 | Ativo | bool | Determina se a conta pode autenticar |
 | DataCriacao | datetime | Data de criação da conta |
 | DataUltimaFalha | datetime? | Marca a última falha de autenticação |
-| QuantidadeFalhas | int | Quantidade de tentativas consecutivas malsucedidas |
+| QuantidadeFalhas | int | Falhas consecutivas desde o último bloqueio; zera ao aplicar bloqueio ou após autenticação bem-sucedida |
+| QuantidadeBloqueiosConsecutivos | int | Bloqueios consecutivos desde a última autenticação bem-sucedida; inicia em zero e é persistido entre reinicializações |
 | BloqueadoAte | datetime? | Momento em que a conta volta a aceitar novas tentativas |
 
 #### Regras de validação
@@ -21,7 +22,12 @@
 - A senha deve ser validada somente por hash, sem retorno em texto plano.
 - A conta deve estar `Ativo = true` para emitir token.
 - A conta deve ser rejeitada quando `BloqueadoAte > now` mesmo que a senha seja correta, até o término do bloqueio temporário.
-- Tentativas malsucedidas devem reiniciar o contador somente quando uma tentativa for validada com sucesso ou quando o lockout expirar.
+- Cada três falhas consecutivas resultam em bloqueio; ao aplicar o bloqueio, `QuantidadeFalhas` volta a zero e `QuantidadeBloqueiosConsecutivos` é incrementado.
+- A duração do primeiro bloqueio é 10 minutos; a duração seguinte dobra a cada bloqueio consecutivo e não excede 24 horas.
+- Recusas durante bloqueio ativo não incrementam contadores nem alteram o prazo do bloqueio.
+- Uma autenticação bem-sucedida zera `QuantidadeFalhas`, `QuantidadeBloqueiosConsecutivos`, `DataUltimaFalha` e `BloqueadoAte`.
+- Atualizações concorrentes dos contadores e do prazo devem ser atômicas no repositório.
+- A migração do armazenamento existente deve inicializar `QuantidadeBloqueiosConsecutivos` como zero sem perder contas nem outros estados persistidos.
 
 ### CredencialDeServico
 
@@ -61,6 +67,7 @@
 
 - O token deve conter somente a identidade do usuário e a validade.
 - O token não pode conter senha, hash ou dados extras de autorização.
+- O token expira após 60 minutos da emissão.
 
 ## Estados e transições
 
@@ -68,7 +75,7 @@
 
 - `Ativa`: aceita autenticação quando a senha coincide e o lockout não está ativo.
 - `Inativa`: não aceita autenticação; consulta retorna `Existe = true` e `Ativa = false`.
-- `EmBloqueioTemporario`: após N falhas seguidas, a conta fica bloqueada por janela temporária. A função de autenticação deve recusar novas tentativas até `BloqueadoAte` e então liberar automaticamente.
+- `EmBloqueioTemporario`: após cada grupo de três falhas consecutivas, a conta fica bloqueada por `min(10 minutos × 2^(QuantidadeBloqueiosConsecutivos - 1), 24 horas)`. A função de autenticação recusa tentativas até `BloqueadoAte`; o término libera novas tentativas sem apagar a sequência de bloqueios.
 
 ### Fluxo principal
 
@@ -76,8 +83,8 @@
 2. Sistema valida formato e login sem distinção de caixa.
 3. Sistema verifica existência, estado e tempo de bloqueio.
 4. Sistema valida hash da senha.
-5. Se válida e ativa: emite token JWT e resete falhas.
-6. Se inválida: incrementa falha e aplica lockout temporário conforme limite.
+5. Se válida e ativa: emite token JWT de 60 minutos e zera os contadores e o estado de bloqueio.
+6. Se inválida: incrementa as falhas; na terceira falha, incrementa a sequência de bloqueios, define o prazo escalonado e zera as falhas correntes.
 
 ## Regras de negócio críticas
 
