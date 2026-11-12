@@ -57,39 +57,30 @@ specs/001-jwt-user-auth/
 ### Source Code (repository root)
 
 ```text
-src/
-├── Autenticador.Api/
-│   ├── Controllers/
-│   ├── Program.cs
-│   ├── Extensions/
-│   └── Models/
-├── Autenticador.Application/
-│   ├── Services/
-│   ├── Interfaces/
-│   └── Validators/
-├── Autenticador.Domain/
-│   ├── Entities/
-│   ├── ValueObjects/
-│   └── Enums/
-├── Autenticador.Infrastructure/
-│   ├── Data/
-│   ├── Repositories/
-│   └── Security/
-└── Autenticador.Common/
-    └── Helpers/
-
-tests/
-├── Autenticador.UnitTests/
-│   ├── Services/
-│   └── Security/
-├── Autenticador.IntegrationTests/
-│   ├── Controllers/
-│   └── Contracts/
-└── Autenticador.Testing/
-    └── Fixtures/
+Autenticador.Api/
+├── Controllers/
+├── Program.cs
+├── Extensions/
+└── Models/
+Autenticador.Application/
+├── Services/
+└── Interfaces/
+Autenticador.Domain/
+├── Entities/
+└── Models/
+Autenticador.Infrastructure/
+├── Data/
+├── Repositories/
+└── Security/
+Autenticador.UnitTests/
+└── Services/
+Autenticador.IntegrationTests/
+├── Controllers/
+├── Fixtures/
+└── Startup/
 ```
 
-**Structure Decision**: A implementação seguirá a separação em camadas exigida pela constituição, com API, aplicação, domínio e infraestrutura explícitos, e testes unitários/integrados abrangendo autenticação, consulta de atividade e seed de contas de teste.
+**Structure Decision**: A implementação seguirá a separação em camadas exigida pela constituição, com projetos na raiz do repositório, e testes unitários/integrados abrangendo autenticação, consulta de atividade e seed de contas de teste.
 
 ## Complexity Tracking
 

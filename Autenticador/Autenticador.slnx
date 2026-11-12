@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="Autenticador.Api/Autenticador.Api.csproj" />
+  <Project Path="Autenticador.Application/Autenticador.Application.csproj" />
+  <Project Path="Autenticador.Domain/Autenticador.Domain.csproj" />
+  <Project Path="Autenticador.Infrastructure/Autenticador.Infrastructure.csproj" />
+  <Project Path="Autenticador.UnitTests/Autenticador.UnitTests.csproj" />
+  <Project Path="Autenticador.IntegrationTests/Autenticador.IntegrationTests.csproj" />
+</Solution>
