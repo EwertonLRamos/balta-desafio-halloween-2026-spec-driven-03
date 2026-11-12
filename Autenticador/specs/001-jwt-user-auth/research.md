@@ -28,3 +28,25 @@ Esses padrões atendem às regras funcionais e às ressalvas de segurança descr
 - Armazenamento seguro de senha: usar `PBKDF2`/`Rfc2898DeriveBytes` ou `PasswordHasher` com salt e hash de credencial.
 - Controle de tentativas: manter contador e tempo de bloqueio por login, validando a janela de falhas em cada tentativa.
 - Seed de usuários: usar inicialização da aplicação e verificação por login único para evitar duplicidade.
+
+## Compatibilidade do Swagger no .NET 10
+
+### Decisão
+
+Atualizar `Swashbuckle.AspNetCore` para a versão estável 10.0.0 ou posterior compatível com .NET 10, mantendo `Swagger`, `SwaggerGen` e `SwaggerUI` na mesma família de versões. Seguir o guia oficial de migração v9→v10 para ajustes necessários em APIs OpenAPI. Não adicionar uma referência direta a `Microsoft.OpenApi` sem evidência de que ela é necessária; verificar o grafo NuGet e as assemblies carregadas em runtime.
+
+### Fundamentação
+
+O projeto mira `net10.0` e referencia `Swashbuckle.AspNetCore` 9.0.3, enquanto as notas oficiais da versão 10.0.0 declaram suporte ao ASP.NET Core 10 e registram a migração do Microsoft.OpenApi para a linha 2.x. O grafo NuGet atualmente resolvido reporta os componentes Swagger na versão 9.0.3, então não há evidência no arquivo de projeto de versões divergentes dentro da família Swashbuckle; a incompatibilidade com o framework e qualquer diferença entre assemblies resolvidas e copiadas devem ser verificadas durante a implementação. O erro em `AddSwaggerGen` deve ser tratado como falha de compatibilidade de carregamento, não como erro de endpoint de autenticação.
+
+### Alternativas consideradas
+
+- Manter Swashbuckle 9.0.3 e limpar apenas `bin/obj`: rejeitado como correção isolada porque não resolve a ausência de suporte ao ASP.NET Core 10 documentada para essa linha.
+- Atualizar apenas `SwaggerGen` ou outro componente individual: rejeitado porque pode criar versões incompatíveis entre os componentes da família; preferir o pacote meta e versões alinhadas.
+- Migrar para a geração OpenAPI nativa do ASP.NET Core: não escolhida nesta alteração de plano, pois mudaria a integração existente sem ser necessária para corrigir o carregamento atual.
+
+### Referências
+
+- Notas oficiais do Swashbuckle.AspNetCore v10.0.0: https://github.com/domaindrivendev/Swashbuckle.AspNetCore/releases/tag/v10.0.0
+- Guia oficial de migração v9→v10: https://github.com/domaindrivendev/Swashbuckle.AspNetCore/blob/v10.0.0/docs/migrating-to-v10.md
+- Notas do v9.0.3: https://github.com/domaindrivendev/Swashbuckle.AspNetCore/releases/tag/v9.0.3

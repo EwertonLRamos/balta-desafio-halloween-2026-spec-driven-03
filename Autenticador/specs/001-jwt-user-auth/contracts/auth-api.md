@@ -89,3 +89,10 @@
 - Os contratos devem ser descritos em português, conforme a constituição.
 - Os objetos de erro devem seguir o formato ProblemDetails.
 - Nenhuma resposta deve incluir `senha`, `hash` ou `perfis` sensíveis.
+
+## Documento OpenAPI (ambiente de desenvolvimento)
+
+- O registro dos serviços Swagger deve permitir a inicialização do host sem exceção de carregamento de tipo.
+- Em `Development`, `GET /swagger/v1/swagger.json` deve retornar HTTP 200 e um documento OpenAPI válido que descreva os endpoints HTTP da API.
+- A interface Swagger UI fica disponível em `/swagger` somente no ambiente de desenvolvimento, conforme a configuração atual da aplicação.
+- Esta superfície não altera a autorização nem os contratos dos endpoints de autenticação; a documentação continua restrita ao ambiente previsto.

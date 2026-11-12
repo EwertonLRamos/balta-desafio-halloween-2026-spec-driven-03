@@ -70,9 +70,21 @@
   - login inexistente: `{ "existe": false, "ativa": false }`
   - sem autorização: HTTP 401/403.
 
+### 7. Inicialização da API e geração OpenAPI
+
+- Pré-condições: restaurar os pacotes, configurar valores locais válidos para JWT e credencial de serviço, e selecionar o ambiente `Development`.
+- Verificação do grafo: executar `dotnet list Autenticador.Api/Autenticador.Api.csproj package --include-transitive` e confirmar que os componentes Swashbuckle resolvidos pertencem à mesma família compatível com .NET 10.
+- Ação: iniciar `Autenticador.Api` com `dotnet run --project Autenticador.Api/Autenticador.Api.csproj` e solicitar `GET /swagger/v1/swagger.json`.
+- Esperado:
+  - a aplicação inicia sem `TypeLoadException` durante `AddSwaggerGen`;
+  - o endpoint retorna HTTP 200 com JSON OpenAPI válido;
+  - a documentação inclui os endpoints da API e a interface está disponível em `/swagger` somente em `Development`.
+- Diagnóstico: se a exceção persistir, comparar o grafo NuGet restaurado com as assemblies informadas no arquivo `.deps.json` e efetivamente carregadas, em vez de tratar a limpeza de saídas como correção suficiente.
+
 ## Critérios de sucesso
 
 - Todos os testes de integração passam para fluxos de sucesso e erro.
 - Nenhuma senha é persistida em texto puro.
 - Não há criação de contas de teste em ambiente de produção.
 - Os contratos de resposta e erro permanecem consistentes em português e com ProblemDetails para validações.
+- A inicialização no ambiente de desenvolvimento não apresenta incompatibilidade binária do Swagger e o documento OpenAPI retorna HTTP 200.
