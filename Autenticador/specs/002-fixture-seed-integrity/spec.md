@@ -8,6 +8,12 @@
 
 **Input**: User description: "Renomear os arquivos e tipos propostos para português. Definir o comportamento de colisão — por exemplo, usar um login alternativo determinístico para a fixture — preservando contas reais e garantindo três contas de teste. Sempre seguir o @constitution.md. Nunca fazer que vá de encontro a ele."
 
+## Clarifications
+
+### Session 2026-11-12
+
+- Q: Como o sistema deve reconhecer, após reinicializações e mudanças de login, que uma conta pertence a uma das três fixtures e não é uma conta real? → A: Cada fixture terá uma chave própria persistida, independente do login.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Disponibilizar contas de teste sem afetar contas reais (Priority: P1)
@@ -51,7 +57,7 @@ Uma pessoa mantenedora precisa encontrar os testes propostos por nomes em portug
 ### Functional Requirements
 
 - **FR-001**: O sistema MUST disponibilizar exatamente três identidades de contas de teste em ambientes de desenvolvimento e teste.
-- **FR-002**: Cada fixture MUST possuir uma identidade estável, independente do login escolhido para ela, para que inicializações repetidas reconheçam a mesma conta.
+- **FR-002**: Cada fixture MUST possuir uma chave própria, persistida e estável, independente do login, para que inicializações repetidas reconheçam a mesma conta sem confundi-la com uma conta real.
 - **FR-003**: Quando um login preferencial estiver ocupado por uma conta que não seja a fixture correspondente, o sistema MUST preservar essa conta sem alterar seus dados, removê-la, desativá-la ou identificá-la como fixture.
 - **FR-004**: Para resolver uma colisão, o sistema MUST escolher o primeiro login livre na sequência `<login>.teste`, `<login>.teste-2`, `<login>.teste-3` e números inteiros crescentes.
 - **FR-005**: A escolha do login alternativo MUST ser determinística e permanecer estável para a mesma fixture em inicializações posteriores.
@@ -63,7 +69,7 @@ Uma pessoa mantenedora precisa encontrar os testes propostos por nomes em portug
 
 ### Key Entities
 
-- **Fixture de conta de teste**: Uma das três identidades de conta reservadas para validações automatizadas, com identidade estável e login escolhido sem colisão.
+- **Fixture de conta de teste**: Uma das três identidades de conta reservadas para validações automatizadas, com chave própria persistida e login escolhido sem colisão.
 - **Conta real preexistente**: Conta existente que não corresponde à identidade de uma fixture e cujos dados e estado devem ser preservados.
 
 ## Success Criteria *(mandatory)*
